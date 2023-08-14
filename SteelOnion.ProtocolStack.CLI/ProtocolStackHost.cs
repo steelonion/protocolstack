@@ -15,8 +15,7 @@ namespace SteelOnion.ProtocolStack.CLI
     {
         ConcurrentQueue<EthernetPacket> packets;
         internal event EventHandler<PacketSendArgs>? SendPacket;
-        static IProtocolStackEntry protocolStack;
-        Stopwatch sw=new Stopwatch();
+        IProtocolStackEntry protocolStack;
         public ProtocolStackHost(PhysicalAddress mac,IPAddress ip)
         {
             packets = new ConcurrentQueue<EthernetPacket>();
@@ -43,15 +42,11 @@ namespace SteelOnion.ProtocolStack.CLI
 
         private void ProtocolStack_SendPacket(object? sender, PacketSendArgs e)
         {
-            var tp1 = sw.Elapsed;
             SendPacket?.Invoke(sender, e);
-            var tp2 = sw.Elapsed;
-            Console.WriteLine("==="+tp1 + " " + tp2);
         }
 
         public bool Enqueue(EthernetPacket packet)
         {
-            sw.Restart();
             if (packets.Count < 1000)
             {
                 packets.Enqueue(packet);

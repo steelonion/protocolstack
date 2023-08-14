@@ -2,7 +2,6 @@
 using SteelOnion.ProtocolStack.ProtocolArgs;
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -31,11 +30,7 @@ namespace SteelOnion.ProtocolStack.Protocol
 
         public override void ReceivePacket(EthernetPacket packet)
         {
-            Stopwatch sw= Stopwatch.StartNew();
             if (!packet.DestinationHardwareAddress.Equals(Broadcast) && !packet.DestinationHardwareAddress.Equals(Config.MacAddress)) return;
-            var e1 = sw.ElapsedTicks;
-            long e2 = 0;
-            long e3 = 0;
             switch (packet.Type)
             {
                 case EthernetType.IPv4:
@@ -57,11 +52,6 @@ namespace SteelOnion.ProtocolStack.Protocol
                     }
                     break;
             }
-            sw.Stop();
-            Console.WriteLine($"E1 {e1}");
-            Console.WriteLine($"E2 {e2}");
-            Console.WriteLine($"E3 {e3}");
-            Console.WriteLine($"E4 {sw.ElapsedTicks}");
         }
 
         protected void ProtocolSendProcess(object? sender, ProtocolEthernetArgs args)

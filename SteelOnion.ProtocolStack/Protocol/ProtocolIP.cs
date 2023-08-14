@@ -14,13 +14,11 @@ namespace SteelOnion.ProtocolStack.Protocol
 {
     internal class ProtocolIP : ProtocolBase<IPPacket,ProtocolEthernetArgs>
     {
-        RuntimeWatch _watch;
         ProtocolICMP icmpModule;
         public ProtocolIP(ProtocolStackConfig config) : base(config)
         {
             icmpModule = new ProtocolICMP(config);
             icmpModule.SendPacket += ProtocolSendProcess;
-            _watch = new RuntimeWatch("IP");
         }
 
         protected void ProtocolSendProcess(object? sender, ProtocolIPArgs args)
@@ -37,25 +35,19 @@ namespace SteelOnion.ProtocolStack.Protocol
 
         public override void ReceivePacket(IPPacket packet)
         {
-            _watch.Start();
             //过滤包
             if (!packet.DestinationAddress.Equals(IPAddress.Broadcast) && !packet.DestinationAddress.Equals(Config.IPAddress)) return;
-            _watch.Record();
             switch (packet.Protocol)
             {
                 case PacketDotNet.ProtocolType.Icmp:
                     {
-                        _watch.Record();
                         if (packet.PayloadPacket is IcmpV4Packet icmp)
                         {
                             icmpModule.ReceivePacket(icmp);
                         }
-                        _watch.Record();
                     }
                     break;
             }
-            _watch.Stop();
-            Console.WriteLine(_watch);
         }
     }
 }
