@@ -31,10 +31,26 @@ namespace SteelOnion.ProtocolStack.CLI
                 capDevice.Open(mode: DeviceModes.Promiscuous);
                 capDevice.StartCapture();
                 host.Start();
-                Console.WriteLine("Press any key to end");
-                Console.ReadKey();
+                var udp= host.GetUdpClient(8888);
+                Task.Factory.StartNew(() => ReadUdp(udp));
+                while (true)
+                {
+                    var cmd = Console.ReadLine();
+                    if (cmd == "exit") break;
+                    udp.Send(new byte[] { 30, 31, 32, 33, 34, 35 }, IPEndPoint.Parse("192.168.3.4:8888"));
+                }
+                udp.Dispose();
                 capDevice.StopCapture();
                 capDevice.Close();
+            }
+        }
+
+        public static void ReadUdp(SimulatedUdpClient udp)
+        {
+            while (true)
+            {
+                var data= udp.Read(out var remote);
+                Console.WriteLine($"{remote}>>{BitConverter.ToString(data)}");
             }
         }
 
@@ -45,22 +61,11 @@ namespace SteelOnion.ProtocolStack.CLI
 
         private static void Device_OnPacketArrival(object sender, PacketCapture e)
         {
-            Stopwatch sw = Stopwatch.StartNew();
             var raw = e.GetPacket();
-            var tp1 = sw.ElapsedTicks;
-            long tp2 = 0;
-            long tp3 = 0;
             if (raw.GetPacket() is EthernetPacket packet)
             {
-                tp2 = sw.ElapsedTicks;
                 host?.Enqueue(packet);
-                tp3 = sw.ElapsedTicks;
             }
-            sw.Stop();
-            Console.WriteLine($"T1 {tp1}");
-            Console.WriteLine($"T2 {tp2}");
-            Console.WriteLine($"T3 {tp3}");
-            Console.WriteLine($"T4 {sw.ElapsedTicks}");
         }
     }
 }

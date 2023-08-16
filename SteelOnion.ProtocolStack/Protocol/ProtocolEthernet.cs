@@ -35,12 +35,10 @@ namespace SteelOnion.ProtocolStack.Protocol
             {
                 case EthernetType.IPv4:
                     {
-                        e2= sw.ElapsedTicks;
                         if (packet.PayloadPacket is IPPacket ipPacket)
                         {
                             ipModule.ReceivePacket(ipPacket);
                         }
-                        e3 = sw.ElapsedTicks;
                     }
                     break;
                 case EthernetType.Arp:
