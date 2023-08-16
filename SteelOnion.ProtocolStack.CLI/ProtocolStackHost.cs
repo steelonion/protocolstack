@@ -16,14 +16,22 @@ namespace SteelOnion.ProtocolStack.CLI
         ConcurrentQueue<EthernetPacket> packets;
         internal event EventHandler<PacketSendArgs>? SendPacket;
         IProtocolStackEntry protocolStack;
+
+        ProtocolStackConfig config;
+
         public ProtocolStackHost(PhysicalAddress mac,IPAddress ip)
         {
             packets = new ConcurrentQueue<EthernetPacket>();
-            ProtocolStackConfig config = new ProtocolStackConfig();
+            config = new ProtocolStackConfig();
             config.MacAddress = mac;
             config.IPAddress = ip;
             protocolStack = ProtocolStackFactory.Instance.GetProtocolStack(config);
             protocolStack.SendPacket += ProtocolStack_SendPacket;
+        }
+
+        public SimulatedUdpClient GetUdpClient(int port)
+        {
+            return config.CreateUdpClient(port);
         }
 
         public void Start()

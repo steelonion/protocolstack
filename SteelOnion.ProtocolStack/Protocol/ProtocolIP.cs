@@ -15,10 +15,13 @@ namespace SteelOnion.ProtocolStack.Protocol
     internal class ProtocolIP : ProtocolBase<IPPacket,ProtocolEthernetArgs>
     {
         ProtocolICMP icmpModule;
+        ProtocolUDP udpModule;
         public ProtocolIP(ProtocolStackConfig config) : base(config)
         {
             icmpModule = new ProtocolICMP(config);
             icmpModule.SendPacket += ProtocolSendProcess;
+            udpModule = new ProtocolUDP(config);
+            udpModule.SendPacket += ProtocolSendProcess;
         }
 
         protected void ProtocolSendProcess(object? sender, ProtocolIPArgs args)
@@ -45,6 +48,11 @@ namespace SteelOnion.ProtocolStack.Protocol
                         {
                             icmpModule.ReceivePacket(icmp);
                         }
+                    }
+                    break;
+                case PacketDotNet.ProtocolType.Udp:
+                    {
+                        if (packet.PayloadPacket is UdpPacket udp) udpModule.ReceivePacket(udp);
                     }
                     break;
             }
