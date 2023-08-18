@@ -31,26 +31,27 @@ namespace SteelOnion.ProtocolStack.CLI
                 capDevice.Open(mode: DeviceModes.Promiscuous);
                 capDevice.StartCapture();
                 host.Start();
-                var udp= host.GetUdpClient(8888);
-                Task.Factory.StartNew(() => ReadUdp(udp));
+                var tcp= host.GetTcpClient(8888,IPEndPoint.Parse("192.168.3.4:8888"));
+                tcp.Connect();
+                Task.Factory.StartNew(() => ReadTcp(tcp));
                 while (true)
                 {
                     var cmd = Console.ReadLine();
                     if (cmd == "exit") break;
-                    udp.Send(new byte[] { 30, 31, 32, 33, 34, 35 }, IPEndPoint.Parse("192.168.3.4:8888"));
+                    tcp.Send(new byte[] { 30, 31, 32, 33, 34, 35 });
                 }
-                udp.Dispose();
+                tcp.Dispose();
                 capDevice.StopCapture();
                 capDevice.Close();
             }
         }
 
-        public static void ReadUdp(SimulatedUdpClient udp)
+        public static void ReadTcp(SimulatedTcpClient tcp)
         {
             while (true)
             {
-                var data= udp.Read(out var remote);
-                Console.WriteLine($"{remote}>>{BitConverter.ToString(data)}");
+                var data= tcp.Read();
+                Console.WriteLine($"{BitConverter.ToString(data)}");
             }
         }
 

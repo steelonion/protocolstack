@@ -1,17 +1,18 @@
 ﻿using PacketDotNet;
 using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Text;
-using System.Threading.Tasks;
+using System.Threading;
 
 namespace SteelOnion.ProtocolStack
 {
-    internal class SimulatedTcpClient
+    /// <summary>
+    /// 模拟TCP客户端
+    /// </summary>
+    public class SimulatedTcpClient
     {
-        static Random Random = new Random(DateTime.Now.Millisecond);
+        internal EventWaitHandle WaitHandle { get; }
+        private static Random Random = new Random();
 
         /// <summary>
         /// 对端地址
@@ -25,11 +26,10 @@ namespace SteelOnion.ProtocolStack
         /// <returns></returns>
         internal bool CheckAck(uint ack)
         {
-            return ack == _seq + 1;
+            return ack == Seq + 1;
         }
 
-        private uint _seq;
-        internal uint Seq => _seq++;
+        internal uint Seq { get; set; }
 
         internal bool Established { get; set; }
 
@@ -40,16 +40,26 @@ namespace SteelOnion.ProtocolStack
 
         internal Func<int, byte[], bool> SendFunc;
 
+        internal Func<int, IPEndPoint, bool> ConnectFunc;
+
         internal BlockingCollection<TcpPacket> _packets;
 
-        public SimulatedTcpClient(int port, Action<int> disposed, Func<int, byte[], bool> sendFunc)
+        public SimulatedTcpClient(int port, IPEndPoint remote, Action<int> disposed, Func<int, byte[], bool> sendFunc, Func<int, IPEndPoint, bool> connectFunc)
         {
+            WaitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
             Established = false;
             Port = port;
+            Remote = remote;
             Disposed = disposed;
             SendFunc = sendFunc;
+            ConnectFunc = connectFunc;
             _packets = new BlockingCollection<TcpPacket>();
-            _seq = (uint)Random.Next();
+            Seq = (uint)Random.Next();
+        }
+
+        public bool Connect()
+        {
+            return ConnectFunc(Port, Remote);
         }
 
         internal void EnqueuePacket(TcpPacket packet)
@@ -70,6 +80,7 @@ namespace SteelOnion.ProtocolStack
         /// <returns></returns>
         public bool Send(byte[] data)
         {
+            if (!Established) return false;
             return SendFunc(Port, data);
         }
 

@@ -15,7 +15,7 @@ namespace SteelOnion.ProtocolStack
         public IPAddress IPAddress { get; set; }
 
         internal ProtocolUDP? UdpModule { get; set; }
-
+        internal ProtocolTCP? TcpModule { get; set; }
 
         public ProtocolStackConfig()
         {
@@ -30,6 +30,15 @@ namespace SteelOnion.ProtocolStack
                 throw new InvalidOperationException("UDP Protocol Stack Not Found");
             }
             return UdpModule.CreateClient(port);
+        }
+
+        public SimulatedTcpClient CreateTcpClient(int port,IPEndPoint remote)
+        {
+            if (TcpModule == null)
+            {
+                throw new InvalidOperationException("TCP Protocol Stack Not Found");
+            }
+            return TcpModule.CreateClient(port, remote);
         }
     }
 }

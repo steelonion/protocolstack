@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -17,6 +18,7 @@ namespace SteelOnion.ProtocolStack.Protocol
         public ProtocolTCP(ProtocolStackConfig config) : base(config)
         {
             _ports = new Dictionary<int, SimulatedTcpClient>();
+            config.TcpModule = this;
         }
 
         public override string ProtocolName => "TCP";
@@ -35,8 +37,10 @@ namespace SteelOnion.ProtocolStack.Protocol
                 TcpPacket packet = new TcpPacket((ushort)port, (ushort)remote.Port);
                 packet.SequenceNumber = client.Seq;
                 packet.Synchronize=true;
+                packet.WindowSize = 65535;
                 SendPacket?.Invoke(this, new ProtocolIPArgs(packet, remote.Address, null));
-                //block
+                client.WaitHandle.Reset();
+                client.WaitHandle.WaitOne(TimeSpan.FromSeconds(1));
                 return true;
             }
             else
@@ -45,17 +49,28 @@ namespace SteelOnion.ProtocolStack.Protocol
             }
         }
 
-        internal SimulatedTcpClient CreateClient(int port)
+        internal SimulatedTcpClient CreateClient(int port,IPEndPoint remote)
         {
             if (port < 0) { throw new ArgumentOutOfRangeException("port"); }
             if (port > 65534) { throw new ArgumentOutOfRangeException("port"); }
             if (_ports.ContainsKey(port)) { throw new InvalidOperationException("port has used"); }
-            return _ports[port] = new SimulatedTcpClient(port, RemoveClient, ClientSendPacket);
+            return _ports[port] = new SimulatedTcpClient(port, remote,RemoveClient, ClientSendPacket, Connect);
         }
 
-        private bool ClientSendPacket(int arg1, byte[] arg2)
+        private bool ClientSendPacket(int port, byte[] data)
         {
-            throw new NotImplementedException();
+            if (_ports.TryGetValue(port, out SimulatedTcpClient? client))
+            {
+                TcpPacket packet = new TcpPacket((ushort)port, (ushort)client.Remote.Port);
+                packet.PayloadData = data;
+                client.Seq += (uint)data.Length;
+                packet.SequenceNumber = client.Seq;
+                packet.Acknowledgment = true;
+                packet.WindowSize = 65535;
+                SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
+                return true;
+            }
+            return false;
         }
 
         private void RemoveClient(int port)
@@ -78,13 +93,22 @@ namespace SteelOnion.ProtocolStack.Protocol
                     var retPacket = new TcpPacket((ushort)client.Port, (ushort)client.Remote.Port);
                     retPacket.Acknowledgment = true;
                     retPacket.AcknowledgmentNumber = packet.SequenceNumber + 1;
-                    SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
+                    client.Seq += 1;
+                    retPacket.SequenceNumber = client.Seq;
+                    retPacket.WindowSize = 65535;
+                    SendPacket?.Invoke(this, new ProtocolIPArgs(retPacket, client.Remote.Address, null));
                     //客户端进入可通讯
                     client.Established = true;
+                    //停止阻塞
+                    client.WaitHandle.Set();
                 }
                 else
                 {
                     client.EnqueuePacket(packet);
+                    var retPacket = new TcpPacket((ushort)client.Port, (ushort)client.Remote.Port);
+                    retPacket.Acknowledgment = true;
+                    retPacket.AcknowledgmentNumber = packet.SequenceNumber + (uint)packet.PayloadData.Length;
+                    SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
                 }
             }
         }
