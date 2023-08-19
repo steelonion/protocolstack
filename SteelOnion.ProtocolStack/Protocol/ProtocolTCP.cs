@@ -102,10 +102,16 @@ namespace SteelOnion.ProtocolStack.Protocol
                     //停止阻塞
                     client.WaitHandle.Set();
                 }
+                if (packet.Finished)
+                {
+                    //开始挥手
+
+                }
                 else
                 {
                     client.EnqueuePacket(packet);
                     var retPacket = new TcpPacket((ushort)client.Port, (ushort)client.Remote.Port);
+                    retPacket.SequenceNumber = client.Seq;
                     retPacket.Acknowledgment = true;
                     retPacket.AcknowledgmentNumber = packet.SequenceNumber + (uint)packet.PayloadData.Length;
                     SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
