@@ -29,6 +29,11 @@ namespace SteelOnion.ProtocolStack.CLI
             protocolStack.SendPacket += ProtocolStack_SendPacket;
         }
 
+        public SimulatedTcpClient GetTcpClient(int port,IPEndPoint remote)
+        {
+            return config.CreateTcpClient(port, remote);
+        }
+
         public SimulatedUdpClient GetUdpClient(int port)
         {
             return config.CreateUdpClient(port);

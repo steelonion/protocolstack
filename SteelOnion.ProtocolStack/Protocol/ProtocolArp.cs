@@ -7,6 +7,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using SteelOnion.ProtocolStack.ProtocolArgs;
+using System.Net.Sockets;
 
 namespace SteelOnion.ProtocolStack.Protocol
 {
@@ -22,6 +23,15 @@ namespace SteelOnion.ProtocolStack.Protocol
         public override string ProtocolName => "ARP";
 
         public override event EventHandler<ProtocolEthernetArgs>? SendPacket;
+
+        internal void Req(IPAddress address)
+        {
+            ArpPacket receivePacket = new ArpPacket(
+            ArpOperation.Request,
+            ProtocolEthernet.Zero, address,
+                Config.MacAddress, Config.IPAddress);
+            SendPacket?.Invoke(this, new ProtocolEthernetArgs(receivePacket, null));
+        }
 
         public override void ReceivePacket(ArpPacket packet)
         {
@@ -39,6 +49,15 @@ namespace SteelOnion.ProtocolStack.Protocol
                         packet.SenderHardwareAddress, packet.SenderProtocolAddress, 
                         Config.MacAddress, Config.IPAddress);
                     SendPacket?.Invoke(this, new ProtocolEthernetArgs(receivePacket, null));
+                }
+            }
+            if(packet.Operation== ArpOperation.Response)
+            {
+                //是否请求自己的IP地址
+                if (packet.TargetProtocolAddress.Equals(Config.IPAddress))
+                {
+                    //将地址信息添加到缓冲表里
+                    ArpCache[packet.SenderProtocolAddress] = packet.SenderHardwareAddress;
                 }
             }
         }
