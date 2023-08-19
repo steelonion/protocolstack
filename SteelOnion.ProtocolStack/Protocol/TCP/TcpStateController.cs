@@ -1,6 +1,7 @@
 ﻿using PacketDotNet;
 using SteelOnion.ProtocolStack.ProtocolArgs;
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 
@@ -11,25 +12,18 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
     /// </summary>
     internal class TcpStateController
     {
-        private static Random Random = new Random();
+
+        #region Private Fields
+
+        private static readonly TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
 
         /// <summary>
         /// 数据缓冲区长度
         /// </summary>
         private static int BufferLength = 65535;
 
-        internal SimulatedTcpClient TcpClient { get; }
+        private static Random Random = new Random();
 
-        internal EventWaitHandle WaitHandle { get; private set; }
-
-        /// <summary>
-        /// 序列号
-        /// </summary>
-        internal uint Seq { get; private set; }
-        /// <summary>
-        /// 确认号
-        /// </summary>
-        internal uint Ack { get; private set; }
         /// <summary>
         /// 数据缓冲区
         /// </summary>
@@ -40,16 +34,13 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
         /// </summary>
         private int _bufferPosition;
 
-        internal ushort LocalPort { get; }
-        internal ushort RemotePort { get; }
-        private IPAddress RemoteAddress { get; }
+        private EventHandler<int> DisposeEvent;
 
-        /// <summary>
-        /// TCP连接的当前状态
-        /// </summary>
-        public ETcpState TcpState { get; set; }
+        #endregion Private Fields
 
-        public TcpStateController(EventHandler<ProtocolIPArgs> send, ushort localPort, IPEndPoint remote)
+        #region Public Constructors
+
+        public TcpStateController(EventHandler<ProtocolIPArgs> send, EventHandler<int> dispose, ushort localPort, IPEndPoint remote)
         {
             _bufferPosition = 0;
             _buffer = new byte[BufferLength];
@@ -58,12 +49,111 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
             RemotePort = (ushort)remote.Port;
             RemoteAddress = remote.Address;
             TcpPacketSend = send;
+            DisposeEvent = dispose;
             //新连接总是在关闭状态
             TcpState = ETcpState.CLOSED;
             WaitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
+            TcpClient = new SimulatedTcpClient(localPort, remote, ClientDisposed, ClientSend, ClientConnect, ClientDisconnect);
         }
 
+        #endregion Public Constructors
+
+        #region Public Events
+
         public event EventHandler<ProtocolIPArgs> TcpPacketSend;
+
+        #endregion Public Events
+
+        #region Public Properties
+
+        /// <summary>
+        /// TCP连接的当前状态
+        /// </summary>
+        public ETcpState TcpState { get; set; }
+
+        #endregion Public Properties
+
+        #region Internal Properties
+
+        /// <summary>
+        /// 确认号
+        /// </summary>
+        internal uint Ack { get; private set; }
+
+        /// <summary>
+        /// 本地端口
+        /// </summary>
+        internal ushort LocalPort { get; }
+
+        /// <summary>
+        /// 远程端口
+        /// </summary>
+        internal ushort RemotePort { get; }
+
+        /// <summary>
+        /// 序列号
+        /// </summary>
+        internal uint Seq { get; private set; }
+
+        internal SimulatedTcpClient TcpClient { get; }
+
+        internal EventWaitHandle WaitHandle { get; private set; }
+
+        #endregion Internal Properties
+
+        #region Private Properties
+
+        private IPAddress RemoteAddress { get; }
+
+        #endregion Private Properties
+
+        #region Public Methods
+
+        public bool Connect()
+        {
+            if (TcpState == ETcpState.CLOSED)
+            {
+                //开始三次握手
+                TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
+                packet.SequenceNumber = Seq;
+                packet.Synchronize = true;
+                packet.WindowSize = 65535;
+                TcpPacketSend?.Invoke(this, new ProtocolIPArgs(packet, RemoteAddress, null));
+                TcpState = ETcpState.SYN_SENTY;
+                WaitHandle.Reset();
+                WaitHandle.WaitOne(ConnectTimeout);
+                if (TcpState != ETcpState.ESTABLISHED)
+                {
+                    return false;
+                }
+                else
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                return false;
+            }
+        }
+
+        public void Disconnect()
+        {
+            if (TcpState == ETcpState.ESTABLISHED)
+            {
+                //开始四次挥手
+                TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
+                packet.SequenceNumber = Seq;
+                packet.Synchronize = true;
+                Ack = packet.SequenceNumber + 1;
+                packet.AcknowledgmentNumber = Ack;
+                packet.WindowSize = 65535;
+                TcpPacketSend?.Invoke(this, new ProtocolIPArgs(packet, RemoteAddress, null));
+                TcpState = ETcpState.FIN_WAIT_1;
+                WaitHandle.Reset();
+                WaitHandle.WaitOne(TimeSpan.FromSeconds(1));
+            }
+        }
 
         public void ReceiveTcpPacket(TcpPacket packet)
         {
@@ -109,13 +199,14 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
                             if (packet.Push)
                             {
                                 //把缓冲区的数据压入客户端
+                                TcpClient.EnqueuePacket(_buffer.Take(_bufferPosition).ToArray());
                                 _bufferPosition = 0;
                             }
                         }
                     }
                     break;
 
-                case ETcpState.FIN_WAIT_1:
+                case ETcpState.FIN_WAIT_1://主动断开
                     {
                         if (packet.Acknowledgment)
                         {
@@ -124,7 +215,8 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
                         }
                     }
                     break;
-                case ETcpState.FIN_WAIT_2:
+
+                case ETcpState.FIN_WAIT_2://确认到断开
                     {
                         if (packet.Acknowledgment && packet.Finished)
                         {
@@ -133,7 +225,8 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
                         }
                     }
                     break;
-                case ETcpState.CLOSE_WAIT:
+
+                case ETcpState.CLOSE_WAIT://等待关闭
                     {
                         if (packet.Acknowledgment)
                         {
@@ -145,6 +238,38 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
             }
         }
 
+        #endregion Public Methods
+
+        #region Private Methods
+
+        private void ClientConnect(object? sender, EventArgs e)
+        {
+            TcpClient.IsConnected = Connect();
+        }
+
+        private void ClientDisconnect(object? sender, EventArgs e)
+        {
+            Disconnect();
+        }
+        private void ClientDisposed(object? sender, EventArgs e)
+        {
+            //断开连接
+            Disconnect();
+            DisposeEvent.Invoke(this, LocalPort);
+        }
+
+        private void ClientSend(object? sender, byte[] e)
+        {
+            TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
+            packet.SequenceNumber = Seq;
+            Seq += (uint)e.Length;
+            packet.Acknowledgment = true;
+            packet.Push = true;
+            packet.AcknowledgmentNumber = Ack;
+            packet.WindowSize = 65535;
+            packet.PayloadData = e;
+            TcpPacketSend(this, new ProtocolIPArgs(packet, RemoteAddress, null));
+        }
         /// <summary>
         /// 发送响应
         /// </summary>
@@ -198,50 +323,7 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
             }
         }
 
-        public void Disconnect()
-        {
-            if (TcpState == ETcpState.ESTABLISHED)
-            {
-                //开始四次挥手
-                TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
-                packet.SequenceNumber = Seq;
-                packet.Synchronize = true;
-                Ack = packet.SequenceNumber + 1;
-                packet.AcknowledgmentNumber = Ack;
-                packet.WindowSize = 65535;
-                TcpPacketSend?.Invoke(this, new ProtocolIPArgs(packet, RemoteAddress, null));
-                TcpState = ETcpState.FIN_WAIT_1;
-                WaitHandle.Reset();
-                WaitHandle.WaitOne(TimeSpan.FromSeconds(1));
-            }
-        }
+        #endregion Private Methods
 
-        public bool Connect()
-        {
-            if (TcpState == ETcpState.CLOSED)
-            {
-                //开始三次握手
-                TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
-                packet.SequenceNumber = Seq;
-                packet.Synchronize = true;
-                packet.WindowSize = 65535;
-                TcpPacketSend?.Invoke(this, new ProtocolIPArgs(packet, RemoteAddress, null));
-                TcpState = ETcpState.SYN_SENTY;
-                WaitHandle.Reset();
-                WaitHandle.WaitOne(TimeSpan.FromSeconds(1));
-                if (TcpState != ETcpState.ESTABLISHED)
-                {
-                    return false;
-                }
-                else
-                {
-                    return true;
-                }
-            }
-            else
-            {
-                return false;
-            }
-        }
     }
 }

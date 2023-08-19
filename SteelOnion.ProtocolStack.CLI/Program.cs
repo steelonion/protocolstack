@@ -25,13 +25,13 @@ namespace SteelOnion.ProtocolStack.CLI
             if(int.TryParse(num,out int devNum))
             {
                 capDevice = devices[devNum];
-                host = new ProtocolStackHost(capDevice.MacAddress, IPAddress.Parse("192.168.3.24"));
+                host = new ProtocolStackHost(capDevice.MacAddress, IPAddress.Parse("192.168.56.1"));
                 host.SendPacket += ProtocolStack_SendPacket;
                 capDevice.OnPacketArrival += Device_OnPacketArrival;
                 capDevice.Open(mode: DeviceModes.Promiscuous);
                 capDevice.StartCapture();
                 host.Start();
-                var tcp= host.GetTcpClient(8888,IPEndPoint.Parse("192.168.3.4:8888"));
+                var tcp= host.GetTcpClient(8888,IPEndPoint.Parse("192.168.56.101:8888"));
                 tcp.Connect();
                 Task.Factory.StartNew(() => ReadTcp(tcp));
                 while (true)
