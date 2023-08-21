@@ -35,11 +35,14 @@ namespace SteelOnion.ProtocolStack.Protocol
         private void ResendQueue(object? state)
         {
             if (_waitQueue.Count == 0) return;
-            while (_waitQueue.Peek().WaitTime > timeoutSpan)
+            while (_waitQueue.TryPeek(out var argsPeek))
             {
-                var args = _waitQueue.Dequeue();
-                ProtocolSendProcess(this, args);
-                if (_waitQueue.Count == 0) break;
+                if (argsPeek.WaitTime > timeoutSpan)
+                {
+                    var args = _waitQueue.Dequeue();
+                    ProtocolSendProcess(this, args);
+                    if (_waitQueue.Count == 0) break;
+                }
             }
         }
 

@@ -3,9 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteelOnion.ProtocolStack", "SteelOnion.ProtocolStack\SteelOnion.ProtocolStack.csproj", "{3045E178-C523-46A2-B638-55C342F19F6F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SteelOnion.ProtocolStack", "SteelOnion.ProtocolStack\SteelOnion.ProtocolStack.csproj", "{3045E178-C523-46A2-B638-55C342F19F6F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteelOnion.ProtocolStack.CLI", "SteelOnion.ProtocolStack.CLI\SteelOnion.ProtocolStack.CLI.csproj", "{24C46670-8E52-49FC-845A-16D25B0D2CA1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SteelOnion.ProtocolStack.CLI", "SteelOnion.ProtocolStack.CLI\SteelOnion.ProtocolStack.CLI.csproj", "{24C46670-8E52-49FC-845A-16D25B0D2CA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SteelOnion.ProtocolStackTests", "SteelOnion.ProtocolStackTests\SteelOnion.ProtocolStackTests.csproj", "{A3EA3644-DA8C-48FA-B4F0-F029354990E7}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -21,6 +23,10 @@ Global
 		{24C46670-8E52-49FC-845A-16D25B0D2CA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{24C46670-8E52-49FC-845A-16D25B0D2CA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{24C46670-8E52-49FC-845A-16D25B0D2CA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A3EA3644-DA8C-48FA-B4F0-F029354990E7}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A3EA3644-DA8C-48FA-B4F0-F029354990E7}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A3EA3644-DA8C-48FA-B4F0-F029354990E7}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A3EA3644-DA8C-48FA-B4F0-F029354990E7}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

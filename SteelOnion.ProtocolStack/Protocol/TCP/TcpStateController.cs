@@ -144,8 +144,8 @@ namespace SteelOnion.ProtocolStack.Protocol.TCP
                 //开始四次挥手
                 TcpPacket packet = new TcpPacket(LocalPort, RemotePort);
                 packet.SequenceNumber = Seq;
-                packet.Synchronize = true;
-                Ack = packet.SequenceNumber + 1;
+                packet.Acknowledgment = true;
+                packet.Finished = true;
                 packet.AcknowledgmentNumber = Ack;
                 packet.WindowSize = 65535;
                 TcpPacketSend?.Invoke(this, new ProtocolIPArgs(packet, RemoteAddress, null));
