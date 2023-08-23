@@ -1,8 +1,6 @@
-﻿using PacketDotNet;
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Net;
-using System.Threading;
 
 namespace SteelOnion.ProtocolStack
 {
@@ -11,61 +9,55 @@ namespace SteelOnion.ProtocolStack
     /// </summary>
     public class SimulatedTcpClient
     {
-        internal EventWaitHandle WaitHandle { get; }
-        private static Random Random = new Random();
+        #region Internal Fields
+
+        internal BlockingCollection<byte[]> _packets;
 
         /// <summary>
-        /// 对端地址
+        /// 连接
         /// </summary>
-        public IPEndPoint Remote { get; }
+        internal EventHandler ConnectEvent;
 
         /// <summary>
-        /// 检查ACK是否正确
+        /// 断开连接
         /// </summary>
-        /// <param name="ack"></param>
-        /// <returns></returns>
-        internal bool CheckAck(uint ack)
+        internal EventHandler DisconnectEvent;
+
+        /// <summary>
+        /// 释放
+        /// </summary>
+        internal EventHandler DisposeEvent;
+
+        /// <summary>
+        /// 发送数据
+        /// </summary>
+        internal EventHandler<byte[]> SendEvent;
+
+        #endregion Internal Fields
+
+
+
+        #region Public Constructors
+
+        public SimulatedTcpClient(int port, IPEndPoint remote, EventHandler disposed, EventHandler<byte[]> send, EventHandler connect, EventHandler disconnect)
         {
-            return ack == Seq + 1;
-        }
-
-        internal uint Seq { get; set; }
-
-        internal bool Established { get; set; }
-
-        /// <summary>
-        /// 当前实例已经被释放
-        /// </summary>
-        internal Action<int> Disposed;
-
-        internal Func<int, byte[], bool> SendFunc;
-
-        internal Func<int, IPEndPoint, bool> ConnectFunc;
-
-        internal BlockingCollection<TcpPacket> _packets;
-
-        public SimulatedTcpClient(int port, IPEndPoint remote, Action<int> disposed, Func<int, byte[], bool> sendFunc, Func<int, IPEndPoint, bool> connectFunc)
-        {
-            WaitHandle = new EventWaitHandle(false, EventResetMode.ManualReset);
-            Established = false;
+            IsConnected = false;
             Port = port;
             Remote = remote;
-            Disposed = disposed;
-            SendFunc = sendFunc;
-            ConnectFunc = connectFunc;
-            _packets = new BlockingCollection<TcpPacket>();
-            Seq = (uint)Random.Next();
+            DisposeEvent = disposed;
+            SendEvent = send;
+            ConnectEvent = connect;
+            DisconnectEvent = disconnect;
+            _packets = new BlockingCollection<byte[]>();
         }
 
-        public bool Connect()
-        {
-            return ConnectFunc(Port, Remote);
-        }
+        #endregion Public Constructors
 
-        internal void EnqueuePacket(TcpPacket packet)
-        {
-            _packets.Add(packet);
-        }
+
+
+        #region Public Properties
+
+        public bool IsConnected { get; internal set; }
 
         /// <summary>
         /// 端口号
@@ -73,15 +65,27 @@ namespace SteelOnion.ProtocolStack
         public int Port { get; }
 
         /// <summary>
-        /// 发送数据流
+        /// 对端地址
         /// </summary>
-        /// <param name="data"></param>
-        /// <param name="remote"></param>
-        /// <returns></returns>
-        public bool Send(byte[] data)
+        public IPEndPoint Remote { get; }
+
+        #endregion Public Properties
+
+
+
+        #region Public Methods
+
+        public bool Connect()
         {
-            if (!Established) return false;
-            return SendFunc(Port, data);
+            ConnectEvent(this, EventArgs.Empty);
+            return IsConnected;
+        }
+
+        public void Dispose()
+        {
+            _packets.CompleteAdding();
+            DisconnectEvent.Invoke(this, EventArgs.Empty);
+            DisposeEvent.Invoke(this, EventArgs.Empty);
         }
 
         /// <summary>
@@ -91,14 +95,35 @@ namespace SteelOnion.ProtocolStack
         /// <returns></returns>
         public byte[] Read()
         {
-            var packet = _packets.Take();
-            return packet.PayloadData;
+            var bytes = _packets.Take();
+            return bytes;
         }
 
-        public void Dispose()
+        /// <summary>
+        /// 发送数据流
+        /// </summary>
+        /// <param name="data"></param>
+        /// <param name="remote"></param>
+        /// <returns></returns>
+        public bool Send(byte[] data)
         {
-            _packets.CompleteAdding();
-            Disposed?.Invoke(Port);
+            if (IsConnected)
+            {
+                SendEvent(this, data);
+                return true;
+            }
+            return false;
         }
+
+        #endregion Public Methods
+
+        #region Internal Methods
+
+        internal void EnqueuePacket(byte[] data)
+        {
+            _packets.Add(data);
+        }
+
+        #endregion Internal Methods
     }
 }

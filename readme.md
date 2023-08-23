@@ -1,18 +1,23 @@
-# 虚拟协议栈
+# Virtual Protocol Stack
 
-## 介绍
+## Introduction
 
-通过软件实现常用协议栈，便于在软件中模拟计算机节点
+This project aims to implement a common protocol stack using software, allowing for the simulation of computer nodes within software.
 
-## 实现
+## Implementation
 
 - [x] ARP
 - [x] ICMP/Ping
 - [ ] ICMP
 - [x] IP
-- [ ] TCP
-- [ ] UDP
+- [x] UDP
+- [x] TCP/Client
+- [ ] TCP/Server
 
-## 问题
+## Issues
 
-- 目前测试下来似乎Windows下会拦截非网卡MAC地址的包，导致测试程序无法响应外部报文
+Currently, it seems that Windows intercepts packets with non-network card MAC addresses during testing, causing the test program to be unable to respond to external messages.
+
+## Usage
+
+Please refer to the unit test project and CLI project for details.

@@ -4,6 +4,12 @@
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <Authors>SteelOnion</Authors>
+    <Description>A simple basic network protocol stack simulation library </Description>
+    <Copyright>MIT license</Copyright>
+    <PackageProjectUrl>https://github.com/steelonion/protocolstack</PackageProjectUrl>
+    <AssemblyVersion>1.0.0</AssemblyVersion>
+    <FileVersion>1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>

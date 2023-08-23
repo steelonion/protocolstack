@@ -13,7 +13,7 @@ namespace SteelOnion.ProtocolStack.CLI
 {
     internal class ProtocolStackHost
     {
-        ConcurrentQueue<EthernetPacket> packets;
+        BlockingCollection<EthernetPacket> packets;
         internal event EventHandler<PacketSendArgs>? SendPacket;
         IProtocolStackEntry protocolStack;
 
@@ -21,7 +21,7 @@ namespace SteelOnion.ProtocolStack.CLI
 
         public ProtocolStackHost(PhysicalAddress mac,IPAddress ip)
         {
-            packets = new ConcurrentQueue<EthernetPacket>();
+            packets = new BlockingCollection<EthernetPacket>();
             config = new ProtocolStackConfig();
             config.MacAddress = mac;
             config.IPAddress = ip;
@@ -45,10 +45,8 @@ namespace SteelOnion.ProtocolStack.CLI
             {
                 while (true)
                 {
-                    if (packets.TryDequeue(out var packet))
-                    {
-                        protocolStack?.ReceivePacket(packet);
-                    }
+                    var packet = packets.Take();
+                    protocolStack?.ReceivePacket(packet);
                 }
             });
         }
@@ -62,7 +60,7 @@ namespace SteelOnion.ProtocolStack.CLI
         {
             if (packets.Count < 1000)
             {
-                packets.Enqueue(packet);
+                packets.Add(packet);
                 return true;
             }
             return false;

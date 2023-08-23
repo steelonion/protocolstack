@@ -1,116 +1,80 @@
 ﻿using PacketDotNet;
+using SteelOnion.ProtocolStack.Protocol.TCP;
 using SteelOnion.ProtocolStack.ProtocolArgs;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Sockets;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace SteelOnion.ProtocolStack.Protocol
 {
     internal class ProtocolTCP : ProtocolBase<TcpPacket, ProtocolIPArgs>
     {
+        #region Private Fields
 
-        private Dictionary<int, SimulatedTcpClient> _ports;
+        private Dictionary<int, TcpStateController> _tcpStateControllers;
+
+        #endregion Private Fields
+
+        #region Public Constructors
 
         public ProtocolTCP(ProtocolStackConfig config) : base(config)
         {
-            _ports = new Dictionary<int, SimulatedTcpClient>();
+            _tcpStateControllers = new Dictionary<int, TcpStateController>();
             config.TcpModule = this;
         }
 
-        public override string ProtocolName => "TCP";
+        #endregion Public Constructors
 
-        /// <summary>
-        /// 发起一个tcp连接请求
-        /// </summary>
-        /// <param name="port"></param>
-        /// <param name="remote"></param>
-        /// <returns></returns>
-        private bool Connect(int port,IPEndPoint remote)
-        {
-            if (_ports.TryGetValue(port,out var client))
-            {
-                //开始三次握手
-                TcpPacket packet = new TcpPacket((ushort)port, (ushort)remote.Port);
-                packet.SequenceNumber = client.Seq;
-                packet.Synchronize=true;
-                packet.WindowSize = 65535;
-                SendPacket?.Invoke(this, new ProtocolIPArgs(packet, remote.Address, null));
-                client.WaitHandle.Reset();
-                client.WaitHandle.WaitOne(TimeSpan.FromSeconds(1));
-                return true;
-            }
-            else
-            {
-                return false;
-            }
-        }
-
-        internal SimulatedTcpClient CreateClient(int port,IPEndPoint remote)
-        {
-            if (port < 0) { throw new ArgumentOutOfRangeException("port"); }
-            if (port > 65534) { throw new ArgumentOutOfRangeException("port"); }
-            if (_ports.ContainsKey(port)) { throw new InvalidOperationException("port has used"); }
-            return _ports[port] = new SimulatedTcpClient(port, remote,RemoveClient, ClientSendPacket, Connect);
-        }
-
-        private bool ClientSendPacket(int port, byte[] data)
-        {
-            if (_ports.TryGetValue(port, out SimulatedTcpClient? client))
-            {
-                TcpPacket packet = new TcpPacket((ushort)port, (ushort)client.Remote.Port);
-                packet.PayloadData = data;
-                client.Seq += (uint)data.Length;
-                packet.SequenceNumber = client.Seq;
-                packet.Acknowledgment = true;
-                packet.WindowSize = 65535;
-                SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
-                return true;
-            }
-            return false;
-        }
-
-        private void RemoveClient(int port)
-        {
-            //开始四次挥手
-            _ports.Remove(port);
-        }
+        #region Public Events
 
         public override event EventHandler<ProtocolIPArgs>? SendPacket;
 
+        #endregion Public Events
+
+        #region Public Properties
+
+        public override string ProtocolName => "TCP";
+
+        #endregion Public Properties
+
+        #region Public Methods
+
         public override void ReceivePacket(TcpPacket packet)
         {
-            if (_ports.TryGetValue(packet.DestinationPort, out SimulatedTcpClient? client))
+            if (_tcpStateControllers.TryGetValue(packet.DestinationPort, out TcpStateController? client))
             {
-                //服务器端确认报文
-                if (packet.Synchronize && packet.Acknowledgment)
-                {
-                    //此处应当验证
-                    //发送应答
-                    var retPacket = new TcpPacket((ushort)client.Port, (ushort)client.Remote.Port);
-                    retPacket.Acknowledgment = true;
-                    retPacket.AcknowledgmentNumber = packet.SequenceNumber + 1;
-                    client.Seq += 1;
-                    retPacket.SequenceNumber = client.Seq;
-                    retPacket.WindowSize = 65535;
-                    SendPacket?.Invoke(this, new ProtocolIPArgs(retPacket, client.Remote.Address, null));
-                    //客户端进入可通讯
-                    client.Established = true;
-                    //停止阻塞
-                    client.WaitHandle.Set();
-                }
-                else
-                {
-                    client.EnqueuePacket(packet);
-                    var retPacket = new TcpPacket((ushort)client.Port, (ushort)client.Remote.Port);
-                    retPacket.Acknowledgment = true;
-                    retPacket.AcknowledgmentNumber = packet.SequenceNumber + (uint)packet.PayloadData.Length;
-                    SendPacket?.Invoke(this, new ProtocolIPArgs(packet, client.Remote.Address, null));
-                }
+                client.ReceiveTcpPacket(packet);
             }
         }
+
+        #endregion Public Methods
+
+        #region Internal Methods
+
+        internal SimulatedTcpClient CreateClient(int port, IPEndPoint remote)
+        {
+            if (port < 0) { throw new ArgumentOutOfRangeException("port"); }
+            if (port > 65534) { throw new ArgumentOutOfRangeException("port"); }
+            if (_tcpStateControllers.ContainsKey(port)) { throw new InvalidOperationException("port has used"); }
+            var tcpStateController = new TcpStateController(ClientSendPacket, RemoveClient, (ushort)port, remote);
+            _tcpStateControllers[port] = tcpStateController;
+            return tcpStateController.TcpClient;
+        }
+
+        #endregion Internal Methods
+
+        #region Private Methods
+
+        private void ClientSendPacket(object? sender, ProtocolIPArgs e)
+        {
+            SendPacket?.Invoke(this, e);
+        }
+
+        private void RemoveClient(object? sender, int e)
+        {
+            _tcpStateControllers.Remove(e);
+        }
+
+        #endregion Private Methods
     }
 }
