@@ -6,11 +6,20 @@
     <Nullable>enable</Nullable>
     <Authors>SteelOnion</Authors>
     <Description>A simple basic network protocol stack simulation library </Description>
-    <Copyright>MIT license</Copyright>
+    <Copyright>MIT</Copyright>
     <PackageProjectUrl>https://github.com/steelonion/protocolstack</PackageProjectUrl>
     <AssemblyVersion>1.0.0</AssemblyVersion>
     <FileVersion>1.0.0</FileVersion>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\readme.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="PacketDotNet" Version="1.4.7" />
